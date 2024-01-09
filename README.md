@@ -1,5 +1,8 @@
 **EasySR**
 
+https://huggingface.co/spaces/hwonheo/easysr
+EasySR HF-StreamlitApp
+
 ![image](https://github.com/hwonheo/easysr/assets/109127356/afdc6f41-8b48-4ca8-b294-cf7f81a9157e)
 
 
