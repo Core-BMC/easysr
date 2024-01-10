@@ -8,6 +8,7 @@ import random
 import numpy as np
 import nibabel as nib
 import logging
+import validation
 from scipy.ndimage import zoom
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
@@ -15,7 +16,6 @@ from network.generator import ResnetGenerator
 from network.discriminator import PatchDiscriminator
 from torch.cuda.amp import GradScaler, autocast
 import matplotlib.pyplot as plt
-
 
 def check_cuda():
     """Checks CUDA availability and prints GPU information."""
@@ -79,8 +79,8 @@ class MRIDataset(Dataset):
         high_res_image = self.normalize_image(high_res_image)
         low_res_image = self.normalize_image(low_res_image)
 
-        high_res_tensor = torch.tensor(np.expand_dims(high_res_image, axis=0), dtype=torch.float16)
-        low_res_tensor = torch.tensor(np.expand_dims(low_res_image, axis=0), dtype=torch.float16)
+        high_res_tensor = torch.tensor(np.expand_dims(high_res_image, axis=0), dtype=torch.float32)
+        low_res_tensor = torch.tensor(np.expand_dims(low_res_image, axis=0), dtype=torch.float32)
 
         if self.transforms:
             subject = tio.Subject(high_res=tio.ScalarImage(tensor=high_res_tensor))
@@ -108,6 +108,11 @@ class MRIDataset(Dataset):
         self.epoch += 1
         self.update_transforms()
 
+def split_dataset(file_list, validation_split=0.2):
+    """Splits the file list into training and validation sets."""
+    random.shuffle(file_list)
+    split_index = int(len(file_list) * (1 - validation_split))
+    return file_list[:split_index], file_list[split_index:]
 
 def train(epoch, epochs, dataloader, device, generator, discriminator, criterion_g, criterion_d,
           optimizer_g, optimizer_d, scaler, best_loss, ckpt_final_path, log_file, save_dir, checkpoint_freq):
@@ -226,9 +231,14 @@ def main():
     # Prepare data
     file_list = glob.glob('train_data/*.nii') + glob.glob('train_data/*.nii.gz')
     if not file_list:
-                raise RuntimeError("No training data found in 'train_data' directory.")
-    dataloader = DataLoader(MRIDataset(file_list, args.low_res_shape, args.high_res_shape),
-                            batch_size=args.batch_size, shuffle=True)
+        raise RuntimeError("No training data found in 'train_data' directory.")
+
+    # Split data
+    train_files, val_files = split_dataset(file_list, validation_split=0.2)
+    train_dataloader = DataLoader(MRIDataset(train_files, args.low_res_shape, args.high_res_shape),
+                                  batch_size=args.batch_size, shuffle=True)
+    val_dataloader = DataLoader(MRIDataset(val_files, args.low_res_shape, args.high_res_shape),
+                                  batch_size=args.batch_size, shuffle=False)
 
     # Initialize the GAN components
     generator = ResnetGenerator().to(device)
@@ -279,17 +289,25 @@ def main():
     os.makedirs(ckpt_final_path, exist_ok=True)
     log_file = os.path.join(ckpt_final_path, 'best_checkpoints_log.txt')
 
+    # Validation setup
+    validation_recorder = validation.ValidationRecorder(
+        os.path.join(args.save_path, 'validation_data.csv'))
+    validation_recorder.initialize_csv()
+
     # Training process
     scaler = GradScaler()
     for epoch in range(start_epoch, args.epochs):
-        best_loss = train(epoch, args.epochs, dataloader, device, generator, 
-                          discriminator, criterion_g, criterion_d, optimizer_g, 
-                          optimizer_d, scaler, best_loss, ckpt_final_path, log_file, 
-                          save_dir, args.checkpoint_freq)
+        # Training
+        best_loss = train(epoch, args.epochs, train_dataloader, device, generator, 
+                        discriminator, criterion_g, criterion_d, optimizer_g, 
+                        optimizer_d, scaler, best_loss, ckpt_final_path, log_file, 
+                        save_dir, args.checkpoint_freq)        
+        # Validation
+        if (epoch + 1) % 10 == 0:
+            validation_recorder.validate_and_record(epoch, val_dataloader, device, 
+                                                    generator, criterion_g)
         logging.info(f"Epoch {epoch+1}/{args.epochs} completed")
-
     logging.info("Training completed")
 
 if __name__ == "__main__":
     main()
-
