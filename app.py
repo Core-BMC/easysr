@@ -187,7 +187,8 @@ def main():
     with col1:
         st.markdown("<h3 style='text-align: center;'>MRI File Upload (NIFTI)</h3>",
                     unsafe_allow_html=True)      
-        uploaded_file = st.file_uploader("", type=["nii", "nii.gz"], key='file_uploader')
+        uploaded_file = st.file_uploader("MRI File Upload", type=["nii", "nii.gz"], 
+                                         key='file_uploader', label_visibility="hidden")
 
         if uploaded_file is not None:
             st.session_state['uploaded_file'] = uploaded_file
@@ -245,7 +246,7 @@ def main():
                      help='Caution: Pressing the Clear All button will delete the contents of the generate folder.'):
             clear_output_folder('infer/generate')
             clear_session()
-            st.experimental_rerun()
+            st.rerun()
 
     st.subheader("\n")
     st.subheader("\n")
