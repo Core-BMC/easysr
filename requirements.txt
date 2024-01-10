@@ -7,3 +7,4 @@ SimpleITK
 torchio
 antspyx
 streamlit
+scikit-image
