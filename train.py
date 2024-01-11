@@ -209,17 +209,54 @@ def main():
     and execute the training process.
     """
     check_cuda()
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--patch_size', nargs=3, type=int, default=[64, 64, 64])
-    parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--batch_size', type=int, default=4)
-    parser.add_argument('--save_path', type=str, default='ckpt')
-    parser.add_argument('--final', nargs='?', const='ckpt/ckpt_final', default=None, 
-                        help="Continue training from final checkpoint. Optionally specify the checkpoint folder.")
-    parser.add_argument('--low_res_shape', nargs=3, type=int, default=[128, 32, 128])
-    parser.add_argument('--high_res_shape', nargs=3, type=int, default=[128, 192, 128])
-    parser.add_argument('--checkpoint_path', type=str, default=None, help="Path to a previous checkpoint")
-    parser.add_argument('--checkpoint_freq', type=int, default=50, help="Frequency of saving checkpoints (in epochs)")
+    parser = argparse.ArgumentParser(
+    description="Train a 3D GAN model using MRI data."
+    )
+    parser.add_argument(
+        '--patch_size', nargs=3, type=int, default=[64, 64, 64],
+        help="Size of the 3D patch from the input image."
+    )
+    parser.add_argument(
+        '--epochs', type=int, default=100,
+        help="Number of epochs for training the model."
+    )
+    parser.add_argument(
+        '--batch_size', type=int, default=4,
+        help="Batch size for training."
+    )
+    parser.add_argument(
+        '--shuffle', type=bool, default=True,
+        help="Whether to shuffle the training dataset."
+    )
+    parser.add_argument(
+        '--num_workers', type=int, default=4,
+        help="Number of workers for data loading."
+    )
+    parser.add_argument(
+        '--save_path', type=str, default='ckpt',
+        help="Path to save training checkpoints and logs."
+    )
+    parser.add_argument(
+        '--final', nargs='?', const='ckpt/ckpt_final', default=None, 
+        help=("Continue training from final checkpoint. Optionally specify "
+            "the checkpoint folder.")
+    )
+    parser.add_argument(
+        '--low_res_shape', nargs=3, type=int, default=[128, 32, 128],
+        help="Shape of the low-resolution MRI images."
+    )
+    parser.add_argument(
+        '--high_res_shape', nargs=3, type=int, default=[128, 192, 128],
+        help="Shape of the high-resolution MRI images."
+    )
+    parser.add_argument(
+        '--checkpoint_path', type=str, default=None,
+        help="Path to a previous checkpoint for resuming training."
+    )
+    parser.add_argument(
+        '--checkpoint_freq', type=int, default=50,
+        help="Frequency (in epochs) for saving training checkpoints."
+    )
     args = parser.parse_args()
 
     # Setup device and directories
@@ -236,9 +273,9 @@ def main():
     # Split data
     train_files, val_files = split_dataset(file_list, validation_split=0.2)
     train_dataloader = DataLoader(MRIDataset(train_files, args.low_res_shape, args.high_res_shape),
-                                  batch_size=args.batch_size, shuffle=True)
+                                  batch_size=args.batch_size, shuffle=args.shuffle, num_workers=args.num_workers)
     val_dataloader = DataLoader(MRIDataset(val_files, args.low_res_shape, args.high_res_shape),
-                                  batch_size=args.batch_size, shuffle=False)
+                                  batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     # Initialize the GAN components
     generator = ResnetGenerator().to(device)
@@ -291,7 +328,7 @@ def main():
 
     # Validation setup
     validation_recorder = validation.ValidationRecorder(
-        os.path.join(args.save_path, 'validation_data.csv'))
+        os.path.join(save_dir, 'validation_data.csv'))  
     validation_recorder.initialize_csv()
 
     # Training process
@@ -303,9 +340,9 @@ def main():
                         optimizer_d, scaler, best_loss, ckpt_final_path, log_file, 
                         save_dir, args.checkpoint_freq)        
         # Validation
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 10 == 1:  
             validation_recorder.validate_and_record(epoch, val_dataloader, device, 
-                                                    generator, criterion_g)
+                                                generator, criterion_g)
         logging.info(f"Epoch {epoch+1}/{args.epochs} completed")
     logging.info("Training completed")
 
