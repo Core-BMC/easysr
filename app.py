@@ -4,11 +4,14 @@ import nibabel as nib
 import torch
 from scipy.ndimage import zoom
 from network.generator import ResnetGenerator
+import time
+from pathlib import Path
 import ants
 import tempfile
 import os
 import matplotlib.pyplot as plt
 import shutil
+from pathlib import Path
 
 # Class for handling MRI inference
 class MRIInference:
@@ -77,7 +80,7 @@ class MRIInference:
         resampled_generated_path = os.path.join(output_path, 'resampled_generated.nii.gz')
         resample_to_isotropic(temp_generated_path, resampled_generated_path)
         base_name = os.path.basename(original_file_path)
-        gen_file_name = base_name.replace(".nii", "_gen.nii")
+        gen_file_name = f"{Path(base_name).stem}_{int(time.time())}_gen{Path(base_name).suffix}"
         warped_file_path = os.path.join(output_path, gen_file_name)
         affine_registration(
             resampled_file_path, resampled_generated_path, warped_file_path)
@@ -142,7 +145,8 @@ def clear_session():
 
 def main():
     # Sidebar - How to Use Guide
-    st.sidebar.title("How to Use EasySR")
+    st.sidebar.subheader("_How to Use EasySR_", divider='red')
+    
     st.sidebar.markdown(
         "**Step-by-Step Guide:**\n\n"
         "1. **Prepare Your Data**: \n\n\tGet your rat brain T2 MRI data. "
@@ -171,10 +175,9 @@ def main():
     )
 
     # Main function for Streamlit UI
-    st.markdown("<h1 style='text-align: center;'>EasySR:</h1>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center;'>Rat Brain T2 MRI SR-Reconstruction</h2>", unsafe_allow_html=True)
-    st.title("\n")
-    col1, col2 = st.columns([0.5, 0.5])
+    st.markdown("<h1 style='text-align: center;'>EasySR</h1>", unsafe_allow_html=True)
+    st.subheader("_Easy WebUI App for Rat Brain MRI 3D SR-Recon DL Inference_", divider='red')
+    
 
     original_slice_path = None
     inferred_slice_path = None
@@ -184,82 +187,73 @@ def main():
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    with col1:
-        st.markdown("<h3 style='text-align: center;'>MRI File Upload (NIFTI)</h3>",
-                    unsafe_allow_html=True)      
-        uploaded_file = st.file_uploader("MRI File Upload", type=["nii", "nii.gz"], 
-                                         key='file_uploader', label_visibility="hidden")
+     
+    uploaded_file = st.file_uploader("_MRI File Upload (NIFTI)_", 
+                                         type=["nii", "nii.gz"], key='file_uploader')
 
-        if uploaded_file is not None:
-            st.session_state['uploaded_file'] = uploaded_file
-            file_name = uploaded_file.name
-            infer_button = st.button("EasySR (start inference)", type="primary")
+    if uploaded_file is not None:
+        st.session_state['uploaded_file'] = uploaded_file
+        file_name = uploaded_file.name
+        infer_button = st.button("EasySR (start inference)", type="primary")
 
-            if infer_button:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".nii.gz") as tmp_file:
-                    tmp_file.write(uploaded_file.getvalue())
-                    file_path = tmp_file.name
+        if infer_button:
+            temp_dir = tempfile.gettempdir()
+            temp_file_path = os.path.join(temp_dir, file_name)
 
-                try:
-                    input_tensor = inference_engine.load_image(file_path)
-                    warped_image_path = inference_engine.infer(
-                        input_tensor, file_path, output_path)
+            with open(temp_file_path, "wb") as tmp_file:
+                tmp_file.write(uploaded_file.getvalue())
 
-                    gen_file_name = file_name.replace(".nii", "_gen.nii")
-                    download_file_path = os.path.join(output_path, gen_file_name)
-                    shutil.copy(warped_image_path, download_file_path)
+            try:
+                input_tensor = inference_engine.load_image(temp_file_path)
+                warped_image_path = inference_engine.infer(
+                    input_tensor, temp_file_path, output_path)
 
-                    original_img = nib.load(file_path).get_fdata()
-                    inferred_img = nib.load(warped_image_path).get_fdata()
+                gen_file_name = file_name.replace(".nii", "_gen.nii")
+                download_file_path = os.path.join(output_path, gen_file_name)
+                shutil.copy(warped_image_path, download_file_path)
 
-                    original_slice_path = os.path.join(output_path, "original_slice.jpg")
-                    inferred_slice_path = os.path.join(output_path, "inferred_slice.jpg")
-                    save_middle_slice(original_img, original_slice_path)
-                    save_middle_slice(inferred_img, inferred_slice_path)
+                original_img = nib.load(temp_file_path).get_fdata()
+                inferred_img = nib.load(warped_image_path).get_fdata()
 
-                except Exception as e:
-                    st.error(f"Error during inference: {e}")
+                original_slice_path = os.path.join(output_path, "original_slice.jpg")
+                inferred_slice_path = os.path.join(output_path, "inferred_slice.jpg")
+                save_middle_slice(original_img, original_slice_path)
+                save_middle_slice(inferred_img, inferred_slice_path)
 
-                if file_path and os.path.exists(file_path):
-                    os.remove(file_path)
+            except Exception as e:
+                st.error(f"Error during inference: {e}")
 
-    with col2:
-        st.header("\n")
-        st.header("\n")
-        st.header("\n")
-        st.header("\n")
-        st.header("\n")
-        st.header("\n")
-        st.header("\n")
-        st.subheader("\n")
-        if download_file_path and os.path.exists(download_file_path):
-            with open(download_file_path, "rb") as file:
-                st.download_button(
-                    label="Download (EasySR inferred-MRI)",
-                    data=file,
-                    file_name=gen_file_name,
-                    mime="application/gzip",
-                    type="primary"
-                )
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    if download_file_path and os.path.exists(download_file_path):
+        with open(download_file_path, "rb") as file:
+            st.download_button(
+                label="Download (EasySR inferred-MRI)",
+                data=file,
+                file_name=gen_file_name,
+                mime="application/gzip",
+                type="primary"
+            )
         
-        if st.button('Clear All', 
-                     help='Caution: Pressing the Clear All button will delete the contents of the generate folder.'):
-            clear_output_folder('infer/generate')
-            clear_session()
-            st.rerun()
+    if st.button('Clear Generated All', 
+        help='Caution: Pressing the Clear All button will delete the contents of the generate folder.'):
+        clear_output_folder('infer/generate')
+        clear_session()
+        st.rerun()
 
     st.subheader("\n")
     st.subheader("\n")
     st.subheader("\n")
     if original_slice_path and os.path.exists(original_slice_path):
         st.subheader("Comparison of Inferred slice")
-        col3, col4 = st.columns([0.5, 0.5])
-        with col3:
+        col1, col2 = st.columns([0.5, 0.5])
+        with col1:
             if original_slice_path and os.path.exists(original_slice_path):
                 st.markdown("**Original**")
                 st.image(original_slice_path, caption="Original MRI", width=300)
         
-        with col4:
+        with col2:
             if inferred_slice_path and os.path.exists(inferred_slice_path):
                 st.markdown("**EasySR**")
                 st.image(inferred_slice_path, caption="Inferred MRI", width=300)
