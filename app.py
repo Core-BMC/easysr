@@ -80,7 +80,7 @@ class MRIInference:
         resampled_generated_path = os.path.join(output_path, 'resampled_generated.nii.gz')
         resample_to_isotropic(temp_generated_path, resampled_generated_path)
         base_name = os.path.basename(original_file_path)
-        gen_file_name = f"{Path(base_name).stem}_{int(time.time())}_gen{Path(base_name).suffix}"
+        gen_file_name = f"{Path(base_name).stem}_{int(time.time())}_gen.nii.gz"
         warped_file_path = os.path.join(output_path, gen_file_name)
         affine_registration(
             resampled_file_path, resampled_generated_path, warped_file_path)
