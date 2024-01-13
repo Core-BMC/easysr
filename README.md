@@ -1,10 +1,13 @@
 # EasySR: 
-## *Super-Resolution Reconstruction App for Rat Brain MRI*
+## *Easy WebUI App for Rat Brain MRI 3D SR-Recon DL Inference*
 
 #### *EasySR HF-StreamlitApp* https://huggingface.co/spaces/hwonheo/easysr  
 
 
-![image](https://github.com/hwonheo/easysr/assets/109127356/afdc6f41-8b48-4ca8-b294-cf7f81a9157e)
+![image](https://github.com/hwonheo/easysr/assets/109127356/2e707925-5dc0-4517-b73e-bd5fa853fce2)
+![image](https://github.com/hwonheo/easysr/assets/109127356/e2ca5fde-29e4-4df9-93df-05a8e0ef619b)
+
+
 
 
 # Overview
