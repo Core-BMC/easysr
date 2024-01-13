@@ -93,7 +93,7 @@ python train.py --help
 # *Dataset Preparation*
 
 ## 128 x 192 x 128 resampled data needs
-## We'll provide PreProc Script, ASAP.
+## We provided PreProc Script for training dataset (*mri_preproc.py*).
 
  To effectively train the EasySR model, it's essential to prepare your dataset with specific requirements in mind. Ensure your data meets the following criteria for optimal results:
 
