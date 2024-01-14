@@ -174,7 +174,7 @@ Affine registration aligns the generated image with the original MRI scan, facil
 
  *Saving the Result:* The final super-resolution image is saved, providing a detailed and enhanced view of the original MRI scan.
 
- # *Usage (inference.py):*
+ # *Usage (inference.py):* *for cli*
 
  To perform inference, users can run the script with the following command, specifying the paths to their input MRI images, the model checkpoint, and the desired output directory:
 
@@ -186,14 +186,15 @@ python inference.py --input [input_path] --ckpt [checkpoint_path] --output [outp
 
 # WebUI-based Inference (Streamlit App)
 
-# *Usage (app.py):*
+# *Usage (app.py):* *local*
    ```bash
       streamlit run app.py
    ```
   
    or
 
- *Please visit, [EasySR HF-space](https://huggingface.co/spaces/hwonheo/easysr)*
+ *Test your low-res MR images on hf, [EasySR hf-space](https://huggingface.co/spaces/hwonheo/easysr)*
+![image](https://github.com/hwonheo/easysr/assets/109127356/6f5da005-cbc6-4551-ad4a-b6141cdd86f4)
 
 ---
 
@@ -211,9 +212,13 @@ python inference.py --input [input_path] --ckpt [checkpoint_path] --output [outp
 
 ---
 
-# **Reference**
+# **References**
 
-https://github.com/imatge-upc/3D-GAN-superresolution  
+https://github.com/imatge-upc/3D-GAN-superresolution
+https://antspyx.readthedocs.io/en/latest/index.html
+https://github.com/eriklindernoren/PyTorch-GAN
+https://paperswithcode.com/method/gan
+https://github.com/freesurfer/freesurfer
 
 
 ---
