@@ -1,35 +1,34 @@
-import streamlit as st
-import numpy as np
-import nibabel as nib
-import torch
-from scipy.ndimage import zoom
-from network.generator import ResnetGenerator
+import os
+import tempfile
+import threading
 import time
 from pathlib import Path
-import ants
-import tempfile
-import os
-import matplotlib.pyplot as plt
 import shutil
-from pathlib import Path
+import ants
+import matplotlib.pyplot as plt
+import nibabel as nib
+import numpy as np
+import streamlit as st
+import torch
+from network.generator import ResnetGenerator
+from scipy.ndimage import zoom
 
-# Class for handling MRI inference
+# Class to handle MRI image inference
 class MRIInference:
     def __init__(self, model, device, input_shape, output_shape):
+        # Initialize with model, device, and shapes
         self.model = model
         self.device = device
         self.input_shape = input_shape
         self.output_shape = output_shape
 
     def load_image(self, file_path):
-        # Load and preprocess the MRI image
+        # Load and preprocess MRI image
         image = nib.load(file_path).get_fdata()
         rotated_image = np.rot90(image, k=1, axes=(1, 2))
-        mean = np.mean(rotated_image)
-        std = np.std(rotated_image)
+        mean, std = np.mean(rotated_image), np.std(rotated_image)
         normalized_image = (rotated_image - mean) / std
-        min_val = np.min(normalized_image)
-        max_val = np.max(normalized_image)
+        min_val, max_val = np.min(normalized_image), np.max(normalized_image)
         scale = 255 / (max_val - min_val)
         normalized_image = scale * (normalized_image - min_val)
         scale_factors = (
@@ -42,7 +41,7 @@ class MRIInference:
             resampled_image[np.newaxis, np.newaxis, ...], dtype=torch.float32)
 
     def save_image(self, image, file_name):
-        # Save the processed image
+        # Save processed image to file
         image = image.squeeze().cpu().numpy()
         scale_factors = (
             self.output_shape[0] / image.shape[0], 
@@ -52,9 +51,9 @@ class MRIInference:
         resampled_image = zoom(image, scale_factors, order=1)
         resampled_image = np.rot90(resampled_image, k=-1, axes=(1, 2))
         nib.save(nib.Nifti1Image(resampled_image, np.eye(4)), file_name)
-    
+
     def match_sform_affine(self, orig_path, gen_path):
-        # Match the affine of original and generated images
+        # Match affine transformation of original and generated images
         orig_img = nib.load(orig_path)
         orig_affine = orig_img.affine
         gen_img = nib.load(gen_path)
@@ -63,7 +62,7 @@ class MRIInference:
         nib.save(matched_gen_img, gen_path)
 
     def infer(self, input_tensor, original_file_path, output_path):
-        # Inference process
+        # Perform inference on input tensor
         with torch.no_grad():
             self.model.eval()
             output = self.model(input_tensor.to(self.device))
@@ -87,18 +86,42 @@ class MRIInference:
         for temp_file in [temp_orig_path, temp_generated_path, resampled_generated_path]:
             os.remove(temp_file)
         return warped_file_path
+    
+    # Perform inference and handle images
+    def run_inference(input_tensor, temp_file_path, output_path):
+        try:
+            warped_image_path = inference_engine.infer(
+                input_tensor, temp_file_path, output_path)
 
-# Functions for image processing and Streamlit UI handling
+            gen_file_name = temp_file_path.replace(".nii", "_gen.nii")
+            download_file_path = os.path.join(output_path, gen_file_name)
+            shutil.copy(warped_image_path, download_file_path)
+
+            original_img = nib.load(temp_file_path).get_fdata()
+            inferred_img = nib.load(warped_image_path).get_fdata()
+
+            original_slice_path = os.path.join(output_path, "original_slice.jpg")
+            inferred_slice_path = os.path.join(output_path, "inferred_slice.jpg")
+            save_middle_slice(original_img, original_slice_path)
+            save_middle_slice(inferred_img, inferred_slice_path)
+
+            return (original_slice_path, inferred_slice_path, 
+                    download_file_path, gen_file_name)
+        except Exception as e:
+            st.error(f"Error during inference: {e}")
+            return None, None, None, None
+
+# Image processing functions
 def resample_to_isotropic(image_path, output_path):
+    # Resample image to isotropic resolution
     image = ants.image_read(image_path)
     resampled_image = ants.resample_image(
         image, (0.15, 0.15, 0.15), use_voxels=False, interp_type=4)
     ants.image_write(resampled_image, output_path)
     return output_path
 
-
 def affine_registration(fixed_image_path, moving_image_path, output_path):
-    # Register affine of fixed and moving images
+    # Perform affine registration between two images
     fixed_image = ants.image_read(fixed_image_path)
     moving_image = ants.image_read(moving_image_path)
     registration = ants.registration(
@@ -108,7 +131,7 @@ def affine_registration(fixed_image_path, moving_image_path, output_path):
 
 @st.cache_data
 def load_model():
-    # Load the trained model
+    # Load pre-trained model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     generator = ResnetGenerator().to(device)
     checkpoint_path = 'ckpt/ckpt_final/G_latest.pth'
@@ -116,11 +139,12 @@ def load_model():
     generator.load_state_dict(checkpoint)
     return generator, device
 
+# Initialize model and inference engine
 generator, device = load_model()
 inference_engine = MRIInference(generator, device, (128, 32, 128), (128, 192, 128))
 
 def save_middle_slice(image, file_path):
-    # Save middle slice of the MRI image
+    # Save the middle slice of the MRI image
     middle_slice = image[image.shape[0] // 2]
     fig, ax = plt.subplots(figsize=(5, 5))
     ax.imshow(middle_slice, cmap='gray', aspect='auto')
@@ -130,7 +154,7 @@ def save_middle_slice(image, file_path):
     plt.close()
 
 def clear_output_folder(folder_path):
-    # Clear contents of the specified folder
+    # Clear contents of a specified folder
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
         if os.path.isfile(file_path) or os.path.islink(file_path):
@@ -139,46 +163,38 @@ def clear_output_folder(folder_path):
             shutil.rmtree(file_path)
 
 def clear_session():
-    # Clear the session state
+    # Clear Streamlit session state
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
+# Main function for Streamlit UI
 def main():
-    # Sidebar - How to Use Guide
+    global original_slice_path, inferred_slice_path, download_file_path, gen_file_name
+
+    # Setup sidebar with instructions
     st.sidebar.subheader("_How to Use EasySR_", divider='red')
-    
     st.sidebar.markdown(
         "**Step-by-Step Guide:**\n\n"
-        "1. **Prepare Your Data**: \n\n\tGet your rat brain T2 MRI data. "
-        "Ensure it's in NIFTI format. Convert if necessary.\n\n"
-        "2. **Upload Your MRI**: \n\n\tDrag and drop your NIFTI file or use "
-        "the upload button.\n\n"
-        "3. **Start the EasySR**: \n\n\tPress 'EasySR' and we'll handle the rest. "
-        "The process is quick, typically taking just a few seconds to complete!\n\n"
-        "4. **Sit Back and Relax**: \n\n\tNo long waits here - your data will be "
-        "processed in under a minute.\n\n"
-        "5. **View and Download**: \n\n\tAfter processing, view the results and "
-        "use the download button to save the MRI.\n\n"
-        "6. **Use as Needed**: \n\n\tDownload and use your enhanced MRI as you see fit. "
-        "Get your data more!\n\n  #"
-        "#\n\n  "
-        "#\n\n\n  "
-        "#\n\n\n  "
-        "GitHub: EasySR"
-        "\n\n  "
-        "[github.com/hwonheo/easysr](https://github.com/hwonheo/easysr)"
-        "\n\n  "
-        "Huggingface (space): EasySR"
-        "\n\n  "
-        "[huggingface.co/spaces/hwonheo/easysr]"
-        "(https://huggingface.co/spaces/hwonheo/easysr)"
+        "1. **Prepare Your Data**: Make sure your rat brain MRI data "
+        "is in NIFTI format. Convert if needed.\n\n"
+        "2. **Upload Your MRI**: Drag and drop your NIFTI file "
+        "or use the upload button.\n\n"
+        "3. **Start the EasySR**: Click 'EasySR' to begin processing. "
+        "It usually takes a few minutes.\n\n"
+        "4. **Sit Back and Relax**: Wait while your data is processed quickly.\n\n"
+        "5. **View and Download**: After processing, view the results and "
+        "use the download button to save the enhanced MRI data.\n\n"
+        "6. **Use as Needed**: Download and utilize your enhanced MRI. "
+        "Continue using EasySR for more enhancements.\n\n"
+        ":rocket: :red[*EasySR*] \t [Github](https://github.com/hwonheo/easysr)\n\n"
+        ":hugging_face: :orange[*EasySR*] \t [Huggingface](https://huggingface.co/spaces/hwonheo/easysr)"
     )
 
-    # Main function for Streamlit UI
+    # Main interface layout
     st.markdown("<h1 style='text-align: center;'>EasySR</h1>", unsafe_allow_html=True)
-    st.subheader("_Easy WebUI App for Rat Brain MRI 3D SR-Recon DL Inference_", divider='red')
-    
+    st.subheader("_Easy Web UI for Generative 3D Inference of Rat Brain MRI_", divider='red')
 
+    # Initialize paths for processing results
     original_slice_path = None
     inferred_slice_path = None
     download_file_path = None 
@@ -187,76 +203,93 @@ def main():
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-     
+    # File uploader for MRI files
     uploaded_file = st.file_uploader("_MRI File Upload (NIFTI)_", 
-                                         type=["nii", "nii.gz"], key='file_uploader')
+                                     type=["nii", "nii.gz"], key='file_uploader')
 
     if uploaded_file is not None:
+        # Store uploaded file in session state
         st.session_state['uploaded_file'] = uploaded_file
         file_name = uploaded_file.name
+
+        # Inference start button
         infer_button = st.button("EasySR (start inference)", type="primary")
 
         if infer_button:
+            # Temporary directory for file processing
             temp_dir = tempfile.gettempdir()
             temp_file_path = os.path.join(temp_dir, file_name)
 
+            # Write uploaded file to temp directory
             with open(temp_file_path, "wb") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
 
-            try:
-                input_tensor = inference_engine.load_image(temp_file_path)
-                warped_image_path = inference_engine.infer(
-                    input_tensor, temp_file_path, output_path)
+            # Load image and start inference in a thread
+            input_tensor = inference_engine.load_image(temp_file_path)
 
-                gen_file_name = file_name.replace(".nii", "_gen.nii")
-                download_file_path = os.path.join(output_path, gen_file_name)
-                shutil.copy(warped_image_path, download_file_path)
+            def inference_wrapper():
+                # Running inference and processing results
+                global original_slice_path, inferred_slice_path, download_file_path, gen_file_name
+                try:
+                    warped_image_path = inference_engine.infer(
+                        input_tensor, temp_file_path, output_path)
+                    gen_file_name = file_name.replace(".nii", "_gen.nii")
+                    download_file_path = os.path.join(output_path, gen_file_name)
+                    shutil.copy(warped_image_path, download_file_path)
 
-                original_img = nib.load(temp_file_path).get_fdata()
-                inferred_img = nib.load(warped_image_path).get_fdata()
+                    # Load original and inferred images for display
+                    original_img = nib.load(temp_file_path).get_fdata()
+                    inferred_img = nib.load(warped_image_path).get_fdata()
+                    original_slice_path = os.path.join(output_path, "original_slice.jpg")
+                    inferred_slice_path = os.path.join(output_path, "inferred_slice.jpg")
 
-                original_slice_path = os.path.join(output_path, "original_slice.jpg")
-                inferred_slice_path = os.path.join(output_path, "inferred_slice.jpg")
-                save_middle_slice(original_img, original_slice_path)
-                save_middle_slice(inferred_img, inferred_slice_path)
+                    # Save middle slice of both images for comparison
+                    save_middle_slice(original_img, original_slice_path)
+                    save_middle_slice(inferred_img, inferred_slice_path)
+                except Exception as e:
+                    st.error(f"Error during inference: {e}")
+                finally:
+                    if temp_file_path and os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
 
-            except Exception as e:
-                st.error(f"Error during inference: {e}")
+            # Start thread for inference
+            inference_thread = threading.Thread(target=inference_wrapper)
+            inference_thread.start()
 
-            if temp_file_path and os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
+            # Display spinner while processing
+            with st.spinner("Processing your MRI image..."):
+                inference_thread.join()
 
-    if download_file_path and os.path.exists(download_file_path):
-        with open(download_file_path, "rb") as file:
-            st.download_button(
-                label="Download (EasySR inferred-MRI)",
-                data=file,
-                file_name=gen_file_name,
-                mime="application/gzip",
-                type="primary"
-            )
-        
-    if st.button('Clear Generated All', 
-        help='Caution: Pressing the Clear All button will delete the contents of the generate folder.'):
-        clear_output_folder('infer/generate')
-        clear_session()
-        st.rerun()
-
-    st.subheader("\n")
-    st.subheader("\n")
-    st.subheader("\n")
-    if original_slice_path and os.path.exists(original_slice_path):
-        st.subheader("Comparison of Inferred slice")
-        col1, col2 = st.columns([0.5, 0.5])
-        with col1:
-            if original_slice_path and os.path.exists(original_slice_path):
+        # Display comparison images and download button after processing
+        if original_slice_path and os.path.exists(original_slice_path) \
+                and inferred_slice_path and os.path.exists(inferred_slice_path):
+            st.subheader("Comparison of Original and EasySR Inferred Slice")
+            col1, col2 = st.columns([0.5, 0.5])
+            with col1:
                 st.markdown("**Original**")
                 st.image(original_slice_path, caption="Original MRI", width=300)
-        
-        with col2:
-            if inferred_slice_path and os.path.exists(inferred_slice_path):
+            with col2:
                 st.markdown("**EasySR**")
                 st.image(inferred_slice_path, caption="Inferred MRI", width=300)
 
+        if download_file_path and os.path.exists(download_file_path):
+            with open(download_file_path, "rb") as file:
+                st.download_button(
+                    label="Download (EasySR Inferred-MRI)",
+                    data=file,
+                    file_name=gen_file_name,
+                    mime="application/gzip",
+                    type="primary"
+                )
+
+        # Button to clear generated content
+        if st.button('Clear Generated All', 
+            help='Pressing this will delete the contents of the generate folder.'):
+            clear_output_folder('infer/generate')
+            clear_session()
+            st.rerun()
+
+# Entry point for the Streamlit application
 if __name__ == '__main__':
     main()
+
