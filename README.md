@@ -1,11 +1,13 @@
 # EasySR: 
-## *Easy WebUI App for Rat Brain MRI 3D SR-Recon DL Inference*
+## *Easy Web UI for Generative 3D Inference of Rat Brain MRI*
 
 #### *EasySR HF-StreamlitApp* https://huggingface.co/spaces/hwonheo/easysr  
 
+![image](https://github.com/hwonheo/easysr/assets/109127356/5136d8dc-19c9-431a-ba71-8f7907094756)
+![image](https://github.com/hwonheo/easysr/assets/109127356/a3e75b98-86d0-4cf4-b1d7-0d2b21b4c1ce)
+![image](https://github.com/hwonheo/easysr/assets/109127356/4c6df83c-b252-4c45-85a4-194936fdb832)
 
-![image](https://github.com/hwonheo/easysr/assets/109127356/2e707925-5dc0-4517-b73e-bd5fa853fce2)
-![image](https://github.com/hwonheo/easysr/assets/109127356/e2ca5fde-29e4-4df9-93df-05a8e0ef619b)
+
 
 
 
@@ -194,7 +196,8 @@ python inference.py --input [input_path] --ckpt [checkpoint_path] --output [outp
    or
 
  *Test your low-res MR images on hf, [EasySR hf-space](https://huggingface.co/spaces/hwonheo/easysr)*
-![image](https://github.com/hwonheo/easysr/assets/109127356/6f5da005-cbc6-4551-ad4a-b6141cdd86f4)
+![image](https://github.com/hwonheo/easysr/assets/109127356/6ce0008b-3a6a-4cef-a931-8e66e0ba0a6b)
+
 
 ---
 
