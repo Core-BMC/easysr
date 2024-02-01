@@ -28,10 +28,16 @@ pip install -r requirements.txt
 # *Dataset Preparation (before training dataset)*
 
 #### 128 x 192 x 128 resampled data needs
-#### We provided PreProc Script for the training dataset (*mri_preproc.py*)
+We provided PreProc Script for the training dataset (*data_preproc.sh, mri_preproc.py, data_splitter.py*)
 
+To use the data_preproc.sh script, navigate to the directory containing the script in your terminal, then execute it with your input folder path followed by either --t1 or --t2 flag to specify the template type. For example: ./data_preproc.sh -i [input_folder] --t1. Ensure Python and necessary libraries are installed in your environment.
 ```bash
-python mri_preproc.py --input ./your/data/to/preproc --output ./output/folder/to/save --t2 #or --t1
+./data_preproc.sh -i [input_folder] --t1 (or --t2)
+```
+or
+```bash
+python mri_preproc.py --input [input_folder] --output [output_folder] --t2 #or --t1
+python utils/data_splitter.py --input [output_folder]
 ```
  
 ---
