@@ -1,18 +1,106 @@
-# EasySR: 
+# EasySR
 ## *Easy Web UI for Generative 3D Inference of Rat Brain MRI*
 
 #### *EasySR HF-StreamlitApp* https://huggingface.co/spaces/hwonheo/easysr  
-
-![image](https://github.com/hwonheo/easysr/assets/109127356/5136d8dc-19c9-431a-ba71-8f7907094756)
-![image](https://github.com/hwonheo/easysr/assets/109127356/a3e75b98-86d0-4cf4-b1d7-0d2b21b4c1ce)
-![image](https://github.com/hwonheo/easysr/assets/109127356/4c6df83c-b252-4c45-85a4-194936fdb832)
-
+#  
+#  
+---
 
 
 
 
 
-# Overview
+
+
+# *Overview*
+
+ - **EasySR** is a cutting-edge project focused on **super-resolution reconstruction of rat brain MR images**. This project's training code specifically addresses the challenge of enhancing axial slice resolution, commonly recorded as thicker slices in rat brain MRIs. Our approach is tailored to work with high-precision isovoxel rat brain MRI data, captured at a fine resolution of 0.2mm or less.
+#  
+#  
+---
+# *Requirements*
+
+    Python 3.x
+    PyTorch
+#  
+#  
+---
+# *Installation*
+#  
+```bash
+git clone https://github.com/hwonheo/easysr.git
+cd easysr
+pip install -r requirements.txt
+```
+#  
+#  
+---
+# *Dataset Preparation (before train dataset)*
+#  
+### 128 x 192 x 128 resampled data needs
+### We provided PreProc Script for training dataset (*mri_preproc.py*).
+#  
+```bash
+python mri_preproc.py --input ./your/data/to/preproc --output ./output/folder/to/save --t2 #or --t1
+```
+#  
+#  
+---
+#  
+# *Usage (train.py)*
+#  
+#  
+Training own your data (examples) 
+#  
+```bash
+python train.py --epochs 100 --batch_size 4 --save_path './ckpt'
+```
+or, training on going your new data in train folder
+```bash
+python train.py --epochs 100 --batch_size 4 --final './ckpt'
+```
+or, training on going your data in train folder using provided pre-train checkpoint
+```bash
+python train.py --epochs 100 --batch_size 4 --final
+```
+'--help' provide more info
+```bash
+python train.py --help
+```
+#  
+#  
+---
+#  
+ # *Usage (inference.py):* *for cli*
+#  
+ To perform inference, users can run the script with the following command, specifying the paths to their input MRI images, the model checkpoint, and the desired output directory:
+#  
+```bash
+python inference.py --input [input_path] --ckpt [checkpoint_path] --output [output_path]
+```
+#  
+---
+#  
+# WebUI-based Inference (Streamlit App)
+#  
+# *Usage (app.py):* *local*
+   ```bash
+      streamlit run app.py
+   ```
+#    
+   or
+#  
+ *Test your low-res MR images on hf, [EasySR hf-space](https://huggingface.co/spaces/hwonheo/easysr)*
+#  
+#  
+---
+#  
+## More informations about EasySR
+#  
+<details>
+<summary>More informations</summary>
+
+## Overview
 
  - **EasySR** is a cutting-edge project focused on **super-resolution reconstruction of rat brain MR images**. This project's training code specifically addresses the challenge of enhancing axial slice resolution, commonly recorded as thicker slices in rat brain MRIs. Our approach is tailored to work with high-precision isovoxel rat brain MRI data, captured at a fine resolution of 0.2mm or less.
 
@@ -24,7 +112,7 @@
 
 ---
 
-# Key Features of EasySR
+## Key Features of EasySR
 ### 1. High-Performance Architecture:
 
    Built on PyTorch, EasySR offers a high-efficiency and flexible framework, ideal for advanced MRI super-resolution tasks.
@@ -47,57 +135,44 @@
 
 ---
 
-
-# *Requirements*
-
-    Python 3.x
-    PyTorch
-    
-
-  
----
-
-# *Installation*
-
-
-
-```bash
-git clone https://github.com/hwonheo/easysr.git
-cd easysr
-pip install -r requirements.txt
+## Preprocessing flow chart
 ```
 
----
+# MRI Image Processing Script Data Flow
 
-# *Usage (train.py)*
+[ Main Function: main() ]
+    |-> Parse Input Arguments
+    |   [ Input: NIfTI file or folder (--input) ]
+    |   [ Use T2 or T1 template (--t2, --t1) ]
+    |   [ Output folder (--output) ]
+    |
+    |-> Check and Download Model If Needed
+    |   [ Function: download_model_if_needed(templates_folder) ]
+    |
+    |-> Determine Fixed Image Path
+    |   [ Select T1 or T2 template based on arguments ]
+    |
+    v
+[ Instantiate MRIProcessor Class ]
+    |-> Input: Parsed arguments (input, output, fixed_image_path)
+    |
+    |-> Process Files
+    |   [ Method: process_files() ]
+    |   [ Process each file using affine registration ]
+    |
+    v
+[ Affine Registration for Each File ]
+    |-> Method: affine_registration(moving_image_path, output_path)
+    |   [ Read fixed and moving images ]
+    |   [ Perform affine registration using AntsPy ]
+    |   [ Save the registered image to output path ]
+    |
+    v
+[ Completion ]
+    |-> Output: "MRI preprocessing is complete."
 
-
-Training own your data 
-
-```bash
-python train.py --epochs 100 --batch_size 4 --save_path './ckpt'
 ```
-or, training on going your new data in train folder
-```bash
-python train.py --epochs 100 --batch_size 4 --final './ckpt'
-```
-or, training on going your data in train folder using provided pre-train checkpoint
-```bash
-python train.py --epochs 100 --batch_size 4 --final
-```
-'--help' provide more info
-```bash
-python train.py --help
-```
-
----
-
-# *Dataset Preparation*
-
-## 128 x 192 x 128 resampled data needs
-## We provided PreProc Script for training dataset (*mri_preproc.py*).
-
- To effectively train the EasySR model, it's essential to prepare your dataset with specific requirements in mind. Ensure your data meets the following criteria for optimal results:
+To effectively train the EasySR model, it's essential to prepare your dataset with specific requirements in mind. Ensure your data meets the following criteria for optimal results:
 
  1. Resolution and Type: 
    The dataset should consist of high-resolution rat brain MRI images. Each image must be captured with a resolution of **0.2mm** or finer to ensure the model can effectively learn and enhance the image quality. This fine resolution is crucial for achieving the desired super-resolution outcomes.
@@ -116,9 +191,8 @@ python train.py --help
 
  Ensure that your dataset is prepared with care, as the quality of the training data significantly influences the performance of the EasySR model. By adhering to these guidelines, you set the foundation for successful super-resolution reconstruction of rat brain MRI images.
 
----
 
-# Code Structure
+## Code Structure
 
  1. ResnetBlock
  - Purpose: A fundamental building block of the ResnetGenerator, designed to create a convolutional block with residual learning.
@@ -146,11 +220,76 @@ Implementation
   - Purpose and Function:
     - The PatchDiscriminator is tailored to assess localized regions (or 'patches') of the input images, making it particularly effective for tasks like super-resolution where fine details are crucial.
     - By distinguishing between real and upscaled images, this discriminator plays a crucial role in training the generator to produce more realistic super-resolution outputs.
+```
+ResnetGenerator 
+│   (
+│    ngf=32, input_nc=1, output_nc=1, 
+│    n_residual_blocks=2
+│   )
+│   Input: [1, 128, 32, 128]
+│
+├── conv_block1
+│   ├── Conv3d (ngf=32) → Size: [32, 128, 32, 128]
+│   └── LeakyReLU
+│
+├── ResnetBlock x 2 (Repeat for n_residual_blocks)
+│   ├── Conv3d (ngf=32) → Size: [32, 128, 32, 128]
+│   ├── BatchNorm3d
+│   ├── LeakyReLU
+│   ├── Conv3d (ngf=32) → Size: [32, 128, 32, 128]
+│   ├── BatchNorm3d
+│   └── Residual Connection → Size: [32, 128, 32, 128]
+│
+├── conv_block2
+│   ├── Conv3d (ngf=32) → Size: [32, 128, 32, 128]
+│   └── BatchNorm3d
+│
+├── DeUpBlock (Upsampling)
+│   ├── ConvTranspose3d (ngf=32) → Size: [32, 128, 192, 128]
+│   └── LeakyReLU
+│
+└── conv3
+    └── Conv3d (output_nc=1) → Size: [1, 128, 192, 128]
+```
+```
+PatchDiscriminator (input_nc=1, ndf=3)
+│ Input: [1, 128, 192, 128]  # MR Image Size
+│
+├── conv1 (Convolution Block)
+│   ├── Conv3d → Size: [3, 64, 96, 64]  
+│   │    # Kernel Size: 4, Stride: 2, Padding: 1
+│   ├── BatchNorm3d
+│   └── LeakyReLU
+│
+├── conv2 (Convolution Block)
+│   ├── Conv3d → Size: [6, 32, 48, 32]
+│   │    # Kernel Size: 4, Stride: 2, Padding: 1
+│   ├── BatchNorm3d
+│   └── LeakyReLU
+│
+├── conv3 (Convolution Block)
+│   ├── Conv3d → Size: [12, 16, 24, 16]
+│   │    # Kernel Size: 4, Stride: 2, Padding: 1
+│   ├── BatchNorm3d
+│   └── LeakyReLU
+│
+├── conv4 (Convolution Block)
+│   ├── Conv3d → Size: [24, 8, 12, 8]
+│   │    # Kernel Size: 4, Stride: 2, Padding: 1
+│   ├── BatchNorm3d
+│   └── LeakyReLU
+│
+├── conv5 (Final Convolution)
+│   └── Conv3d → Size: [1, 5, 6, 5]
+│        # Kernel Size: 4, Padding: 1
+│
+├── Flatten
+├── Fully Connected Layer
+└── Sigmoid Activation
+```
 
 
----
-
-# Inference Process
+## Inference Process
 
  The EasySR project includes a comprehensive inference script that allows users to apply the trained ResnetGenerator model to their own MRI images for super-resolution reconstruction. Here's an overview of how this process works:
 
@@ -176,32 +315,8 @@ Affine registration aligns the generated image with the original MRI scan, facil
 
  *Saving the Result:* The final super-resolution image is saved, providing a detailed and enhanced view of the original MRI scan.
 
- # *Usage (inference.py):* *for cli*
 
- To perform inference, users can run the script with the following command, specifying the paths to their input MRI images, the model checkpoint, and the desired output directory:
-
-```bash
-python inference.py --input [input_path] --ckpt [checkpoint_path] --output [output_path]
-```
-
----
-
-# WebUI-based Inference (Streamlit App)
-
-# *Usage (app.py):* *local*
-   ```bash
-      streamlit run app.py
-   ```
-  
-   or
-
- *Test your low-res MR images on hf, [EasySR hf-space](https://huggingface.co/spaces/hwonheo/easysr)*
-![image](https://github.com/hwonheo/easysr/assets/109127356/6ce0008b-3a6a-4cef-a931-8e66e0ba0a6b)
-
-
----
-
-# Enhanced Validation with Advanced Image Quality Metrics
+## Enhanced Validation with Advanced Image Quality Metrics
  - Robust Image Quality Assessment:
     The latest update to EasySR introduces a robust validation mechanism, vital for ensuring the super-resolution reconstruction maintains high fidelity compared to the original MR images. Our validation now integrates advanced image quality metrics, including *Structural Similarity Index (SSIM)*, *Peak Signal-to-Noise Ratio (PSNR)*, and *Mean Squared Error (MSE)*. These metrics provide a comprehensive evaluation of image quality, crucial for medical imaging applications where precision is paramount.
 
@@ -213,42 +328,52 @@ python inference.py --input [input_path] --ckpt [checkpoint_path] --output [outp
 
     **This validation upgrade marks a significant step in EasySR's development**, reinforcing our dedication to advancing the field of super-resolution MRI analysis through innovative and reliable solutions.
 
----
 
+</details>
+
+#  
+#  
 # **References**
-
+#  
 https://github.com/imatge-upc/3D-GAN-superresolution
+
+
 https://antspyx.readthedocs.io/en/latest/index.html
+
+
 https://github.com/eriklindernoren/PyTorch-GAN
+
+
 https://paperswithcode.com/method/gan
+
+
 https://github.com/freesurfer/freesurfer
-
-
+#  
+#  
 ---
-
-
-
+#  
 # **Contributing**
-
+#  
 https://github.com/hwonheo  
 https://github.com/ssimu  
 https://github.com/olivepicker  
-
-
+#  
+#  
 ---
-
+#  
 # **License**
-
-not yet.
-
+#  
+not yet decided.
+please contact
+#  
 ---
-
+#  
 # **Contact**
-
+#  
 heohwon@gmail.com
-
+#  
 ---
-
+#  
 ## **Acknowledgements**
-
+#  
 This research was supported by Basic Science Research Program through the National Research Foundation of Korea(NRF) funded by the Ministry of Education(NRF-2022R1I1A1A01072397)
