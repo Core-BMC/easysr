@@ -8,7 +8,7 @@ import random
 import numpy as np
 import nibabel as nib
 import logging
-import validation
+from utils import validation
 from scipy.ndimage import zoom
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
@@ -41,6 +41,27 @@ def setup_logging(log_file):
     logging.getLogger('').addHandler(console)
 
 
+def preprocess_and_save_nifti_as_npy(nifti_dir, save_dir):
+    """
+    Preprocesses NIfTI files and saves them as npy files.
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    file_list = glob.glob(os.path.join(nifti_dir, '*.nii')) + \
+        glob.glob(os.path.join(nifti_dir, '*.nii.gz'))
+    total_files = len(file_list)
+
+    for file_path in tqdm(file_list, desc="Processing files", 
+                          total=total_files, unit="file"):
+        # Load NIfTI file
+        image = nib.load(file_path).get_fdata()
+
+        # Save as npy file
+        file_name = os.path.basename(file_path).split('.')[0]
+        np.save(os.path.join(save_dir, file_name + '.npy'), image)
+
+
 class MRIDataset(Dataset):
     """
     A custom Dataset class for MRI images.
@@ -64,6 +85,9 @@ class MRIDataset(Dataset):
             augmentation_methods = [
                 tio.RandomAffine(degrees=15, translate=(0.1, 0.1, 0.1), scale=(0.9, 1.1)),
                 tio.RandomFlip(axes=(0,)),
+                tio.RandomElasticDeformation(max_displacement=(5, 5, 5)),
+                tio.RandomGamma(log_gamma=(-0.3, 0.3)),
+                tio.RandomBiasField(coefficients=0.5) 
             ]
             selected_transforms = random.sample(augmentation_methods, 
                                                 k=random.randint(1, len(augmentation_methods)))
@@ -73,7 +97,8 @@ class MRIDataset(Dataset):
 
     def __getitem__(self, idx):
         file_path = self.file_list[idx]
-        high_res_image = nib.load(file_path).get_fdata()
+        # Load npy file instead of NIfTI
+        high_res_image = np.load(file_path)
         low_res_image = self.resample_image(high_res_image, self.low_res_shape)
 
         high_res_image = self.normalize_image(high_res_image)
@@ -93,8 +118,15 @@ class MRIDataset(Dataset):
         return np.rot90(image, k=1, axes=(1, 2))
 
     def normalize_image(self, image):
-        image = (image - np.mean(image)) / np.std(image)
-        return 255 * (image - np.min(image)) / (np.max(image) - np.min(image))
+        normalized_image = (image - np.mean(image)) / np.std(image)
+        lower_bound = -2.58
+        upper_bound = 2.58
+        normalized_image = np.clip(normalized_image, lower_bound, upper_bound)
+        min_val = np.min(normalized_image)
+        max_val = np.max(normalized_image)
+        scaled_image = 255 * (normalized_image - min_val) / (max_val - min_val)
+
+        return scaled_image
 
     def resample_image(self, image, target_shape):
         factors = (
@@ -102,17 +134,19 @@ class MRIDataset(Dataset):
             target_shape[1] / image.shape[1],
             target_shape[2] / image.shape[2]
         )
-        return zoom(image, factors, order=1)
+        return zoom(image, factors, order=3)
     
     def on_epoch_end(self):
         self.epoch += 1
         self.update_transforms()
+
 
 def split_dataset(file_list, validation_split=0.2):
     """Splits the file list into training and validation sets."""
     random.shuffle(file_list)
     split_index = int(len(file_list) * (1 - validation_split))
     return file_list[:split_index], file_list[split_index:]
+
 
 def train(epoch, epochs, dataloader, device, generator, discriminator, criterion_g, criterion_d,
           optimizer_g, optimizer_d, scaler, best_loss, ckpt_final_path, log_file, save_dir, checkpoint_freq):
@@ -181,10 +215,11 @@ def load_rotate_and_save_first_image(dataloader, output_path, high_res_shape, lo
     first_data = next(iter(dataloader))
     _, high_res = first_data
     high_res_image = high_res.squeeze().numpy()
-    low_res_image = zoom(high_res_image, (low_res_shape[0] / high_res_image.shape[0], 
-                                          low_res_shape[1] / high_res_image.shape[1], 
-                                          low_res_shape[2] / high_res_image.shape[2]), 
-                                          order=1)
+    low_res_image = zoom(high_res_image, (
+                        low_res_shape[0] / high_res_image.shape[0],  # 128/128
+                        low_res_shape[1] / high_res_image.shape[1],  # 64/192
+                        low_res_shape[2] / high_res_image.shape[2]), # 128/128
+                        order=3)
     high_res_rotated = np.rot90(high_res_image, k=1, axes=(1, 2))
     low_res_rotated = np.rot90(low_res_image, k=1, axes=(1, 2))
     
@@ -213,15 +248,15 @@ def main():
     description="Train a 3D GAN model using MRI data."
     )
     parser.add_argument(
-        '--patch_size', nargs=3, type=int, default=[64, 64, 64],
+        '--patch_size', nargs=3, type=int, default=[32, 32, 32],
         help="Size of the 3D patch from the input image."
     )
     parser.add_argument(
-        '--epochs', type=int, default=100,
+        '--epochs', type=int, default=500,
         help="Number of epochs for training the model."
     )
     parser.add_argument(
-        '--batch_size', type=int, default=4,
+        '--batch_size', type=int, default=2,
         help="Batch size for training."
     )
     parser.add_argument(
@@ -242,7 +277,7 @@ def main():
             "the checkpoint folder.")
     )
     parser.add_argument(
-        '--low_res_shape', nargs=3, type=int, default=[128, 32, 128],
+        '--low_res_shape', nargs=3, type=int, default=[128, 64, 128],
         help="Shape of the low-resolution MRI images."
     )
     parser.add_argument(
@@ -265,17 +300,21 @@ def main():
     setup_logging(os.path.join(args.save_path, 'training_log.txt'))
     logging.info("Training started")
 
-    # Prepare data
-    file_list = glob.glob('train_data/*.nii') + glob.glob('train_data/*.nii.gz')
-    if not file_list:
-        raise RuntimeError("No training data found in 'train_data' directory.")
+    # Preprocess Nifti files save as npy
+    preprocess_and_save_nifti_as_npy('train_data/training', 'train_data/npy_training')
+    preprocess_and_save_nifti_as_npy('train_data/validation', 'train_data/npy_validation')
 
-    # Split data
-    train_files, val_files = split_dataset(file_list, validation_split=0.2)
+    # Use npy files instead of NIfTI files
+    train_files = glob.glob('train_data/npy_training/*.npy')
+    val_files = glob.glob('train_data/npy_validation/*.npy')
+
+    if not train_files or not val_files:
+        raise RuntimeError("No training/validation data found in 'train_data/training' or 'train_data/validation' directories.")
+
     train_dataloader = DataLoader(MRIDataset(train_files, args.low_res_shape, args.high_res_shape),
                                   batch_size=args.batch_size, shuffle=args.shuffle, num_workers=args.num_workers)
     val_dataloader = DataLoader(MRIDataset(val_files, args.low_res_shape, args.high_res_shape),
-                                  batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+                                batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     # Initialize the GAN components
     generator = ResnetGenerator().to(device)
