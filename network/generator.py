@@ -27,9 +27,8 @@ class ResnetBlock(nn.Module):
 class DeUpBlock(nn.Module):
     def __init__(self, inf, onf):
         super(DeUpBlock, self).__init__()
-        # Upsampling only in the width dimension
         self.deupblock = nn.Sequential(
-            nn.ConvTranspose3d(inf, onf, kernel_size=(1, 6, 1), stride=(1, 6, 1), padding=(0, 0, 0)),
+            nn.ConvTranspose3d(inf, onf, kernel_size=(1, 3, 1), stride=(1, 3, 1), padding=(0, 0, 0)),
             nn.LeakyReLU(0.2)
         )
 
@@ -38,7 +37,7 @@ class DeUpBlock(nn.Module):
 
 # Resnet Generator
 class ResnetGenerator(nn.Module):
-    def __init__(self, input_nc=1, output_nc=1, ngf=16, n_residual_blocks=4):
+    def __init__(self, input_nc=1, output_nc=1, ngf=32, n_residual_blocks=2):
         super(ResnetGenerator, self).__init__()
         self.n_residual_blocks = n_residual_blocks
 
@@ -66,4 +65,3 @@ class ResnetGenerator(nn.Module):
         x = self.conv_block2(y) + x
         x = self.deup(x)
         return self.conv3(x)
-
