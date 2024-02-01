@@ -2,56 +2,43 @@
 ## *Easy Web UI for Generative 3D Inference of Rat Brain MRI*
 
 #### *EasySR HF-StreamlitApp* https://huggingface.co/spaces/hwonheo/easysr  
-#  
-#  
+
+![image](https://github.com/hwonheo/easysr/assets/109127356/83508ef7-39e5-4426-954e-ccd86744fb10)
 ---
-
-
-
-
-
-
 
 # *Overview*
 
- - **EasySR** is a cutting-edge project focused on **super-resolution reconstruction of rat brain MR images**. This project's training code specifically addresses the challenge of enhancing axial slice resolution, commonly recorded as thicker slices in rat brain MRIs. Our approach is tailored to work with high-precision isovoxel rat brain MRI data, captured at a fine resolution of 0.2mm or less.
-#  
-#  
+ - **EasySR** is a cutting-edge project focused on **super-resolution reconstruction of rat brain MR images**. This project's training code specifically addresses enhancing axial slice resolution, commonly recorded as thicker slices in rat brain MRIs. Our approach is tailored to work with high-precision isovoxel rat brain MRI data, captured at a fine resolution of 0.2mm or less.
+
 ---
 # *Requirements*
 
     Python 3.x
     PyTorch
-#  
-#  
+
 ---
 # *Installation*
-#  
 ```bash
 git clone https://github.com/hwonheo/easysr.git
 cd easysr
 pip install -r requirements.txt
 ```
-#  
-#  
+
 ---
-# *Dataset Preparation (before train dataset)*
-#  
-### 128 x 192 x 128 resampled data needs
-### We provided PreProc Script for training dataset (*mri_preproc.py*).
-#  
+# *Dataset Preparation (before training dataset)*
+
+#### 128 x 192 x 128 resampled data needs
+#### We provided PreProc Script for the training dataset (*mri_preproc.py*)
+
 ```bash
 python mri_preproc.py --input ./your/data/to/preproc --output ./output/folder/to/save --t2 #or --t1
 ```
-#  
-#  
+ 
 ---
-#  
+
 # *Usage (train.py)*
-#  
-#  
+
 Training own your data (examples) 
-#  
 ```bash
 python train.py --epochs 100 --batch_size 4 --save_path './ckpt'
 ```
@@ -59,7 +46,7 @@ or, training on going your new data in train folder
 ```bash
 python train.py --epochs 100 --batch_size 4 --final './ckpt'
 ```
-or, training on going your data in train folder using provided pre-train checkpoint
+or, training on going your data in train folder using the provided pre-train checkpoint
 ```bash
 python train.py --epochs 100 --batch_size 4 --final
 ```
@@ -67,42 +54,37 @@ python train.py --epochs 100 --batch_size 4 --final
 ```bash
 python train.py --help
 ```
-#  
-#  
+
 ---
-#  
+
  # *Usage (inference.py):* *for cli*
-#  
+ 
  To perform inference, users can run the script with the following command, specifying the paths to their input MRI images, the model checkpoint, and the desired output directory:
-#  
 ```bash
 python inference.py --input [input_path] --ckpt [checkpoint_path] --output [output_path]
 ```
-#  
+
 ---
-#  
-# WebUI-based Inference (Streamlit App)
-#  
-# *Usage (app.py):* *local*
+
+ # *WebUI-based Inference (Streamlit App)*
+
+ ## *Usage (app.py):* *local*
    ```bash
       streamlit run app.py
    ```
-#    
    or
-#  
- *Test your low-res MR images on hf, [EasySR hf-space](https://huggingface.co/spaces/hwonheo/easysr)*
-#  
-#  
+ #### *Test your low-res MR images on* [*EasySR HF-StreamlitApp*](https://huggingface.co/spaces/hwonheo/easysr)
+
 ---
-#  
-## More informations about EasySR
-#  
+
+## More information about EasySR
+
 <details>
-<summary>More informations</summary>
+<summary>More information</summary>
 
 ## Overview
 
- - **EasySR** is a cutting-edge project focused on **super-resolution reconstruction of rat brain MR images**. This project's training code specifically addresses the challenge of enhancing axial slice resolution, commonly recorded as thicker slices in rat brain MRIs. Our approach is tailored to work with high-precision isovoxel rat brain MRI data, captured at a fine resolution of 0.2mm or less.
+ - **EasySR** is a cutting-edge project focused on **super-resolution reconstruction of rat brain MR images**. This project's training code specifically addresses enhancing axial slice resolution, commonly recorded as thicker slices in rat brain MRIs. Our approach is tailored to work with high-precision isovoxel rat brain MRI data, captured at a fine resolution of 0.2mm or less.
 
   - The primary goal of EasySR is to upscale these images to an even finer resolution of 0.15mm, achieving an isotropic output. This enhancement allows for more detailed and precise anatomical studies. However, it's important to note that while EasySR excels in spatial resolution improvement, it does not maintain the original signal intensity due to the normalization process involved. Therefore, this tool may not be suitable for experiments that rely heavily on signal intensity measurements.
 
@@ -189,7 +171,7 @@ To effectively train the EasySR model, it's essential to prepare your dataset wi
  5. Data Organization: 
    Organize your dataset in a structured manner, preferably in a dedicated directory. This organization facilitates easier loading and batch processing of the images during training.
 
- Ensure that your dataset is prepared with care, as the quality of the training data significantly influences the performance of the EasySR model. By adhering to these guidelines, you set the foundation for successful super-resolution reconstruction of rat brain MRI images.
+ Ensure that your dataset is prepared with care, as the training data quality significantly influences the EasySR model's performance. By adhering to these guidelines, you set the foundation for successful super-resolution reconstruction of rat brain MRI images.
 
 
 ## Code Structure
@@ -215,7 +197,7 @@ Implementation
    - The series of convolutions (from conv1 to conv4) gradually downsample the input, extracting increasingly abstract and complex features from the images.
    - The final convolution layer (conv5) is designed to reduce the output to a single channel, setting the stage for binary classification.
   - Output Layer:
-    - Following the convolutional layers, the model employs a flatten layer (nn.Flatten) and a fully connected layer (nn.Linear). The number '539' in the linear layer's input should be adjusted based on the flattened output size of the preceding layers.
+    - Following the convolutional layers, the model employs a flattened layer (nn.Flatten) and a fully connected layer (nn.Linear). The number '539' in the linear layer's input should be adjusted based on the flattened output size of the preceding layers.
     - The final output is obtained through a sigmoid activation function (nn.Sigmoid), providing a probability score indicating whether the input image is real or generated.
   - Purpose and Function:
     - The PatchDiscriminator is tailored to assess localized regions (or 'patches') of the input images, making it particularly effective for tasks like super-resolution where fine details are crucial.
@@ -330,11 +312,10 @@ Affine registration aligns the generated image with the original MRI scan, facil
 
 
 </details>
+  
 
-#  
-#  
 # **References**
-#  
+
 https://github.com/imatge-upc/3D-GAN-superresolution
 
 
@@ -348,32 +329,30 @@ https://paperswithcode.com/method/gan
 
 
 https://github.com/freesurfer/freesurfer
-#  
-#  
+
 ---
-#  
+
 # **Contributing**
-#  
+
 https://github.com/hwonheo  
 https://github.com/ssimu  
 https://github.com/olivepicker  
-#  
-#  
+
 ---
-#  
+
 # **License**
-#  
+
 not yet decided.
 please contact
-#  
+
 ---
-#  
+
 # **Contact**
-#  
+
 heohwon@gmail.com
-#  
+
 ---
-#  
+
 ## **Acknowledgements**
-#  
-This research was supported by Basic Science Research Program through the National Research Foundation of Korea(NRF) funded by the Ministry of Education(NRF-2022R1I1A1A01072397)
+
+This research was supported by the Basic Science Research Program through the National Research Foundation of Korea (NRF) funded by the Ministry of Education (NRF-2022R1I1A1A01072397)
